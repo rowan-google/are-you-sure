@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import type { InfluenceLevel, DecisionRecord } from './types';
+import type { FactorItem, InfluenceLevel, DecisionRecord } from './types';
 import { FACTORS } from './data/emotionsDesires';
 import { MandalaWheel } from './components/MandalaWheel';
 import { StepQuestion } from './components/StepQuestion';
@@ -9,7 +9,7 @@ import { BreathingModal } from './components/BreathingModal';
 import { HistoryModal } from './components/HistoryModal';
 import { AboutModal } from './components/AboutModal';
 import { initTelegramApp, triggerHaptic } from './utils/telegram';
-import { Sparkles, ArrowRight } from 'lucide-react';
+import { Sparkles, ArrowRight, X } from 'lucide-react';
 
 const PRESET_TOPICS = [
   '🛍️ 要不要冲动消费买下某物',
@@ -24,6 +24,7 @@ export function App() {
   const [mode, setMode] = useState<'intro' | 'questioning' | 'summary'>('intro');
   const [decisionTitle, setDecisionTitle] = useState('');
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [previewFactor, setPreviewFactor] = useState<FactorItem | null>(null);
 
   // Initialize assessments with 0 (no disturbance)
   const [assessments, setAssessments] = useState<Record<string, InfluenceLevel>>(() => {
@@ -78,6 +79,7 @@ export function App() {
 
   const handleStart = () => {
     triggerHaptic('medium');
+    setPreviewFactor(null);
     setCurrentIndex(0);
     setMode('questioning');
   };
@@ -119,6 +121,7 @@ export function App() {
     setAssessments(fresh);
     setDecisionTitle('');
     setCurrentIndex(0);
+    setPreviewFactor(null);
     setMode('intro');
   };
 
@@ -136,6 +139,7 @@ export function App() {
       loaded[f.id] = (record.assessments[f.id]?.level ?? 0) as InfluenceLevel;
     });
     setAssessments(loaded);
+    setPreviewFactor(null);
     setMode('summary');
   };
 
@@ -205,23 +209,64 @@ export function App() {
               </div>
             </div>
 
-            {/* Mandala Wheel Preview */}
+            {/* Mandala Wheel Showcase & Preview */}
             <div className="py-2 flex flex-col items-center">
               <MandalaWheel
                 assessments={assessments}
                 size={300}
                 interactive={true}
+                activeFactorId={previewFactor?.id}
                 onSelectFactor={(f) => {
-                  const idx = FACTORS.findIndex((x) => x.id === f.id);
-                  if (idx !== -1) {
-                    setCurrentIndex(idx);
-                    setMode('questioning');
-                  }
+                  triggerHaptic('selection');
+                  setPreviewFactor((prev) => (prev?.id === f.id ? null : f));
                 }}
               />
-              <span className="text-[11px] text-slate-500 mt-2">
-                13 卦象心境轮盘 · 点击任意卦象可直接检视
-              </span>
+
+              {/* Preview Factor Card (Non-disruptive inspection) */}
+              {previewFactor ? (
+                <div
+                  className="w-full max-w-sm mt-3 p-4 bg-slate-900/95 border rounded-2xl animate-fade-in text-left shadow-2xl relative backdrop-blur-md"
+                  style={{ borderColor: `${previewFactor.color}77` }}
+                >
+                  <button
+                    onClick={() => setPreviewFactor(null)}
+                    className="absolute top-2.5 right-2.5 text-slate-400 hover:text-white p-1 rounded-full bg-slate-800/80 transition-colors"
+                    title="收起"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span
+                      className="w-6 h-6 rounded-lg flex items-center justify-center font-serif font-bold text-xs"
+                      style={{
+                        backgroundColor: `${previewFactor.color}25`,
+                        color: previewFactor.color,
+                        border: `1px solid ${previewFactor.color}66`,
+                      }}
+                    >
+                      {previewFactor.name}
+                    </span>
+                    <span className="text-sm font-bold text-white">
+                      {previewFactor.name} · {previewFactor.categoryName}
+                      {previewFactor.sensoryOrgan
+                        ? `（${previewFactor.sensoryOrgan}·${previewFactor.sensoryLabel}）`
+                        : ''}
+                    </span>
+                    <span className="text-xs text-slate-400 font-sans">{previewFactor.englishName}</span>
+                  </div>
+                  <p className="text-xs text-amber-300/90 font-medium mb-1.5">
+                    包含：{previewFactor.subTitle}
+                  </p>
+                  <div className="text-[11px] text-slate-300 leading-relaxed bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+                    <strong className="text-slate-400">心境盲区：</strong>
+                    {previewFactor.cognitiveTrap}
+                  </div>
+                </div>
+              ) : (
+                <span className="text-[11px] text-slate-500 mt-2">
+                  13 卦象心境轮盘 · 轻触任意卦象可预览其意涵与盲区
+                </span>
+              )}
             </div>
 
             {/* Start Button */}
